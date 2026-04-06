@@ -7,8 +7,8 @@ private struct FloatingPanelContentHeightKey: PreferenceKey {
     }
 }
 
-/// Matches `.padding(10)` above and below the shell around the scroll content.
-private let floatingPanelOuterVerticalMargin: CGFloat = 20
+/// Matches vertical shell padding above and below the scroll content (`.padding(6)` × 2).
+private let floatingPanelOuterVerticalMargin: CGFloat = 12
 
 struct FloatingTimerView: View {
     @EnvironmentObject private var tasks: TaskStore
@@ -92,8 +92,8 @@ struct FloatingTimerView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
                 } else {
                     VStack(spacing: 10) {
                         Text("No active task")
@@ -117,7 +117,7 @@ struct FloatingTimerView: View {
                     }
                 }
             }
-            .padding(14)
+            .padding(6)
             .background(
                 GeometryReader { proxy in
                     Color.clear.preference(key: FloatingPanelContentHeightKey.self, value: proxy.size.height)
@@ -131,7 +131,7 @@ struct FloatingTimerView: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(FloatingTimerPalette.shellStroke, lineWidth: 1)
         }
-        .padding(10)
+        .padding(6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onPreferenceChange(FloatingPanelContentHeightKey.self) { height in
             #if os(macOS)
