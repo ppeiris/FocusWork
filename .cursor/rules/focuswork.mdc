@@ -1,0 +1,35 @@
+---
+description: Introduces FocusWork — macOS focus/Pomodoro app, SwiftUI structure, and Obsidian vault data format
+alwaysApply: true
+---
+
+# FocusWork
+
+**FocusWork** is a **macOS** app for structured focus: projects, tasks, estimates, and a **Pomodoro-style** timer (work sessions, floating timer UI). It is built with **Swift** and **SwiftUI**; the Xcode project is `FocusWork.xcodeproj`.
+
+## Code layout (where to look)
+
+| Area | Location |
+|------|----------|
+| App entry / coordination | `FocusWork/AppModel.swift` |
+| Models | `FocusWork/Models/` (e.g. `FocusTask.swift`, project types) |
+| Persistence & vault I/O | `FocusWork/Services/TaskStore.swift` |
+| Timer engine | `FocusWork/Services/PomodoroEngine.swift` |
+| Main UI | `FocusWork/Views/` (`MainWindowView`, `TaskListView`, `SettingsView`, `FloatingTimerView`) |
+| Floating panel (AppKit) | `FocusWork/AppKit/FloatingPanelController.swift` |
+| Release packaging | `scripts/make-dmg.sh` |
+
+## Data: Obsidian vault vs local
+
+- **Obsidian vault mode:** User picks a vault in Settings. Projects are **one markdown file per project** under `<Vault>/FocusWork/Projects/project_*.md` with header metadata and `#fw/…` task tags.
+- **No vault:** JSON in **UserDefaults** (`focuswork.projects`, `focuswork.tasks`).
+
+When generating or editing vault markdown (tasks/projects as files), follow **`docs/FocusWork-Obsidian-Vault-Spec.md`** so files load without repair. Canonical sources of truth for parsing behavior are **`TaskStore.swift`** and **`FocusTask.swift`**.
+
+### **Update the `Obsidian-Vault-Spec.md` file**:
+Everytime when the application makeing any changes to the Obsidian markdown file structure make sure to update `Obsidian-Vault-Spec.md` file accordingly reflect the latest config.
+
+## Agent expectations
+
+- Prefer **Swift/SwiftUI** and existing patterns in this repo; do not assume iOS unless the code already does.
+- After format or persistence changes, align **`docs/FocusWork-Obsidian-Vault-Spec.md`** with implementation if user-facing behavior changes.

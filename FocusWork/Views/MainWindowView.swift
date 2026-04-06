@@ -6,7 +6,9 @@ struct MainWindowView: View {
     var body: some View {
         TabView {
             TaskListView()
+                .environmentObject(model)
                 .environmentObject(model.taskStore)
+                .environmentObject(model.pomodoro)
                 .tabItem { Label("Tasks", systemImage: "checklist") }
 
             SettingsView()
