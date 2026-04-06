@@ -19,6 +19,7 @@
 		B1000000000000000000000A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000A /* SettingsView.swift */; };
 		B1000000000000000000000B /* FloatingTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000B /* FloatingTimerView.swift */; };
 		B1000000000000000000000C /* FloatingPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000C /* FloatingPanelController.swift */; };
+		B1000000000000000000000E /* MenuBarExtraMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000E /* MenuBarExtraMenuView.swift */; };
 		B1000000000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000D /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -35,6 +36,7 @@
 		F1000000000000000000000A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F1000000000000000000000B /* FloatingTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingTimerView.swift; sourceTree = "<group>"; };
 		F1000000000000000000000C /* FloatingPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanelController.swift; sourceTree = "<group>"; };
+		F1000000000000000000000E /* MenuBarExtraMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarExtraMenuView.swift; sourceTree = "<group>"; };
 		F1000000000000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F100000000000000000000FF /* FocusWork.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FocusWork.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -90,6 +92,7 @@
 				F10000000000000000000009 /* TaskListView.swift */,
 				F1000000000000000000000A /* SettingsView.swift */,
 				F1000000000000000000000B /* FloatingTimerView.swift */,
+				F1000000000000000000000E /* MenuBarExtraMenuView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -199,6 +202,7 @@
 				B1000000000000000000000A /* SettingsView.swift in Sources */,
 				B1000000000000000000000B /* FloatingTimerView.swift in Sources */,
 				B1000000000000000000000C /* FloatingPanelController.swift in Sources */,
+				B1000000000000000000000E /* MenuBarExtraMenuView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

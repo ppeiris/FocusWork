@@ -7,7 +7,7 @@ struct FocusWorkApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             MainWindowView()
                 .environmentObject(model)
         }
@@ -41,6 +41,12 @@ struct FocusWorkApp: App {
                 }
                 .keyboardShortcut("f", modifiers: [.command, .option])
             }
+        }
+
+        MenuBarExtra("FocusWork", image: "MenuBarIcon") {
+            MenuBarExtraMenuView()
+                .environmentObject(model)
+                .environmentObject(model.pomodoro)
         }
     }
 
