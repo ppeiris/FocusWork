@@ -20,6 +20,7 @@
 		B1000000000000000000000B /* FloatingTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000B /* FloatingTimerView.swift */; };
 		B1000000000000000000000C /* FloatingPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000C /* FloatingPanelController.swift */; };
 		B1000000000000000000000E /* MenuBarExtraMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000E /* MenuBarExtraMenuView.swift */; };
+		B1000000000000000000000F /* FocusWorkLocalDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000F /* FocusWorkLocalDatabase.swift */; };
 		B1000000000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000D /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +38,7 @@
 		F1000000000000000000000B /* FloatingTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingTimerView.swift; sourceTree = "<group>"; };
 		F1000000000000000000000C /* FloatingPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanelController.swift; sourceTree = "<group>"; };
 		F1000000000000000000000E /* MenuBarExtraMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarExtraMenuView.swift; sourceTree = "<group>"; };
+		F1000000000000000000000F /* FocusWorkLocalDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWorkLocalDatabase.swift; sourceTree = "<group>"; };
 		F1000000000000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F100000000000000000000FF /* FocusWork.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FocusWork.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -81,6 +83,7 @@
 			children = (
 				F10000000000000000000006 /* TaskStore.swift */,
 				F10000000000000000000007 /* PomodoroEngine.swift */,
+				F1000000000000000000000F /* FocusWorkLocalDatabase.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -203,6 +206,7 @@
 				B1000000000000000000000B /* FloatingTimerView.swift in Sources */,
 				B1000000000000000000000C /* FloatingPanelController.swift in Sources */,
 				B1000000000000000000000E /* MenuBarExtraMenuView.swift in Sources */,
+				B1000000000000000000000F /* FocusWorkLocalDatabase.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -340,7 +344,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = FocusWork;
+				INFOPLIST_KEY_CFBundleDisplayName = "FocusWork (Debug)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -348,7 +352,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.focuswork.FocusWork;
+				PRODUCT_BUNDLE_IDENTIFIER = com.focuswork.FocusWork.debug;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

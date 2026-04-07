@@ -4,6 +4,8 @@ import Combine
 final class TaskStore: ObservableObject {
     @Published private(set) var projects: [FocusProject] = []
     @Published private(set) var tasks: [FocusTask] = []
+    /// Row order per project as shown in the main list (and floating panel). Kept in sync with `tasks` via `syncListOrderWithTasks()` and `setTaskOrder`.
+    @Published private(set) var listOrderedTaskIdsByProject: [UUID: [UUID]] = [:]
     @Published var activeTaskId: UUID?
     /// When set, the main window shows the large focus card for this task (set by Start, cleared on other selection).
     @Published private(set) var pinnedFocusDisplayTaskId: UUID?
@@ -14,7 +16,32 @@ final class TaskStore: ObservableObject {
     private let legacyTasksKey = "focuswork.tasks"
     private let activeKey = "focuswork.activeTaskId"
     private let selectedProjectKey = "focuswork.selectedProjectId"
-    private let vaultPathKey = "focuswork.obsidian.vaultPath"
+
+    /// Writes `#fw/created-at` in vault markdown (ISO 8601 with fractional seconds).
+    private static let fwCreatedAtWriteFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let fwCreatedAtParseFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let fwCreatedAtParsePlain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private func parseFwCreatedAtTag(_ raw: String?) -> Date? {
+        let s = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !s.isEmpty else { return nil }
+        if let d = Self.fwCreatedAtParseFractional.date(from: s) { return d }
+        return Self.fwCreatedAtParsePlain.date(from: s)
+    }
 
     /// Invoked before `activeTaskId` changes so the focus timer can persist state for the outgoing task.
     var onWillChangeActiveTask: (() -> Void)?
@@ -24,8 +51,8 @@ final class TaskStore: ObservableObject {
     var onDidReloadFromStorage: (() -> Void)?
 
     init() {
-        if let path = UserDefaults.standard.string(forKey: vaultPathKey), !path.isEmpty {
-            vaultURL = URL(fileURLWithPath: path, isDirectory: true)
+        if let record = FocusWorkLocalDatabase.shared.activeVaultRecord() {
+            vaultURL = URL(fileURLWithPath: record.vaultRootPath, isDirectory: true)
         }
         load()
     }
@@ -80,14 +107,20 @@ final class TaskStore: ObservableObject {
         save()
     }
 
-    func addTask(title: String, estimatedMinutes: Int? = nil, projectId: UUID? = nil) {
+    func addTask(title: String, estimatedMinutes: Int? = nil, projectId: UUID? = nil, notes: String = "") {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         ensureProjectExists()
         let targetProjectId = projectId ?? selectedProjectId ?? projects.first?.id
-        let task = FocusTask(title: trimmed, projectId: targetProjectId, estimatedMinutes: normalizedEstimatedMinutes(estimatedMinutes))
+        let task = FocusTask(
+            title: trimmed,
+            projectId: targetProjectId,
+            estimatedMinutes: normalizedEstimatedMinutes(estimatedMinutes),
+            notes: notes
+        )
         tasks.append(task)
+        syncListOrderWithTasks()
         let firstActiveSelection = activeTaskId == nil
         if firstActiveSelection {
             activeTaskId = task.id
@@ -98,11 +131,12 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    func updateTask(id: UUID, title: String, estimatedMinutes: Int?) {
+    func updateTask(id: UUID, title: String, estimatedMinutes: Int?, notes: String) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let i = tasks.firstIndex(where: { $0.id == id }) else { return }
         tasks[i].title = trimmed
         tasks[i].estimatedMinutes = normalizedEstimatedMinutes(estimatedMinutes)
+        tasks[i].notes = notes
         tasks[i].isCompleted = false
         save()
     }
@@ -113,6 +147,7 @@ final class TaskStore: ObservableObject {
             onWillChangeActiveTask?()
         }
         tasks.removeAll { $0.id == id }
+        syncListOrderWithTasks()
         if pinnedFocusDisplayTaskId == id {
             pinnedFocusDisplayTaskId = nil
         }
@@ -152,7 +187,7 @@ final class TaskStore: ObservableObject {
         save()
     }
 
-    /// Assigns a task to a project. List order is maintained by the UI (`orderedIdsByProject`).
+    /// Assigns a task to a project. List order is maintained in `listOrderedTaskIdsByProject` / `setTaskOrder`.
     func moveTaskToProject(taskId: UUID, projectId: UUID) {
         guard let i = tasks.firstIndex(where: { $0.id == taskId }) else { return }
         guard projects.contains(where: { $0.id == projectId }) else { return }
@@ -176,7 +211,42 @@ final class TaskStore: ObservableObject {
         for (offset, index) in projectIndices.enumerated() {
             tasks[index] = finalProjectTasks[offset]
         }
+        var next = listOrderedTaskIdsByProject
+        next[projectId] = finalProjectTasks.map(\.id)
+        listOrderedTaskIdsByProject = next
         save()
+    }
+
+    /// Task ids for list UI order; falls back to `tasks` storage order for this project.
+    func orderedTaskIds(for projectId: UUID) -> [UUID] {
+        let projectTasks = tasks.filter { $0.projectId == projectId }
+        let fallback = projectTasks.map(\.id)
+        guard let stored = listOrderedTaskIdsByProject[projectId], !stored.isEmpty else {
+            return fallback
+        }
+        return stored
+    }
+
+    /// Updates `listOrderedTaskIdsByProject` after drag reorder (before `setTaskOrder` writes `tasks`).
+    func setListOrderedTaskIds(projectId: UUID, ids: [UUID]) {
+        var next = listOrderedTaskIdsByProject
+        next[projectId] = ids
+        listOrderedTaskIdsByProject = next
+    }
+
+    /// Reconciles stored list order with current tasks (new tasks appended, removed ids dropped).
+    func syncListOrderWithTasks() {
+        var next: [UUID: [UUID]] = [:]
+        for project in projects {
+            let pid = project.id
+            let newIds = tasks.filter { $0.projectId == pid }.map(\.id)
+            let existing = listOrderedTaskIdsByProject[pid] ?? []
+            let existingSet = Set(existing)
+            let newOnly = newIds.filter { !existingSet.contains($0) }
+            let filteredExisting = existing.filter { newIds.contains($0) }
+            next[pid] = filteredExisting + newOnly
+        }
+        listOrderedTaskIdsByProject = next
     }
 
     func setActiveTask(id: UUID?) {
@@ -227,9 +297,23 @@ final class TaskStore: ObservableObject {
         return tasks.first { $0.id == id }
     }
 
-    /// Tasks for a project in master-list order (matches list/vault order for that project).
+    /// Tasks for a project in the same order as the main task list (includes completed tasks).
     func tasksOrderedInProject(projectId: UUID) -> [FocusTask] {
-        tasks.filter { $0.projectId == projectId }
+        let projectTasks = tasks.filter { $0.projectId == projectId }
+        let map = Dictionary(uniqueKeysWithValues: projectTasks.map { ($0.id, $0) })
+        let ids = orderedTaskIds(for: projectId)
+        var seen = Set<UUID>()
+        var result: [FocusTask] = []
+        for id in ids {
+            if let t = map[id] {
+                result.append(t)
+                seen.insert(id)
+            }
+        }
+        for t in projectTasks where !seen.contains(t.id) {
+            result.append(t)
+        }
+        return result
     }
 
     /// Full focus budget for the active task (estimate or default), used as the progress bar denominator.
@@ -267,18 +351,14 @@ final class TaskStore: ObservableObject {
 
     var projectsFolderURL: URL? {
         guard let vaultURL else { return nil }
-        return vaultURL
-            .appendingPathComponent("FocusWork", isDirectory: true)
-            .appendingPathComponent("Projects", isDirectory: true)
+        let relative = FocusWorkLocalDatabase.shared.activeVaultRecord()?.projectsFolderRelativePath
+            ?? VaultRecord.defaultProjectsFolderRelativePath
+        return vaultURL.appendingRelativeDirectoryPath(relative)
     }
 
     func configureVault(url: URL?) {
         vaultURL = url
-        if let url {
-            UserDefaults.standard.set(url.path, forKey: vaultPathKey)
-        } else {
-            UserDefaults.standard.removeObject(forKey: vaultPathKey)
-        }
+        try? FocusWorkLocalDatabase.shared.setLinkedVault(root: url)
         load()
     }
 
@@ -302,6 +382,7 @@ final class TaskStore: ObservableObject {
         normalizeProjectOrder()
         normalizeTaskProjectLinks()
         restoreSelectionState()
+        syncListOrderWithTasks()
         onDidReloadFromStorage?()
     }
 
@@ -313,12 +394,14 @@ final class TaskStore: ObservableObject {
             selectedProjectId = projects.first?.id
         }
 
+        // Do not restore focus to a completed task after launch; user still sees it on the card until then.
         if let s = UserDefaults.standard.string(forKey: activeKey), let id = UUID(uuidString: s),
-           tasks.contains(where: { $0.id == id }) {
-            activeTaskId = id
+           let task = tasks.first(where: { $0.id == id }) {
+            activeTaskId = task.isCompleted ? nil : id
         } else {
-            activeTaskId = tasks.first?.id
+            activeTaskId = tasks.first { !$0.isCompleted }?.id
         }
+        saveActiveTask()
     }
 
     private func save() {
@@ -499,7 +582,7 @@ final class TaskStore: ObservableObject {
 
             let fileNameMap = projectFileNameMap(for: projects)
             for project in projects {
-                let projectTasks = tasks.filter { $0.projectId == project.id }
+                let projectTasks = tasksOrderedInProject(projectId: project.id)
                 let content = renderProjectFile(project: project, tasks: projectTasks)
                 let fileURL = projectsFolderURL.appendingPathComponent(fileNameMap[project.id] ?? fileName(for: project))
                 try content.write(to: fileURL, atomically: true, encoding: .utf8)
@@ -673,7 +756,7 @@ final class TaskStore: ObservableObject {
             "project_color: \(project.cardColor.rawValue)",
             "project_order: \(project.sortOrder)",
             "",
-            "<!-- Task: checkbox line then indented #fw/… tags (priority, id, title, est-min, work-rem-sec, total-focus-sec, completed). Legacy pipe lines still load. -->",
+            "<!-- Task: checkbox line then indented #fw/… tags; optional ```fw-task-note … ``` block for multi-line notes. Legacy pipe lines still load. -->",
             ""
         ]
 
@@ -683,6 +766,7 @@ final class TaskStore: ObservableObject {
             lines.append("  #fw/priority \(task.priority.rawValue)")
             lines.append("  #fw/id \(task.id.uuidString)")
             lines.append("  #fw/title \(encodeFwTagLineValue(task.title))")
+            lines.append("  #fw/created-at \(Self.fwCreatedAtWriteFormatter.string(from: task.createdAt))")
             if let m = task.estimatedMinutes {
                 lines.append("  #fw/est-min \(m)")
             }
@@ -691,6 +775,7 @@ final class TaskStore: ObservableObject {
             }
             lines.append("  #fw/total-focus-sec \(task.totalFocusedSeconds)")
             lines.append("  #fw/completed \(task.isCompleted ? "1" : "0")")
+            appendTaskNotesFencedBlock(to: &lines, notes: task.notes)
         }
 
         lines.append("")
@@ -787,6 +872,7 @@ final class TaskStore: ObservableObject {
 
         var t = focusTaskFromFwTagFields(fields, projectId: projectId)
         if checkboxDone { t.isCompleted = true }
+        parseOptionalTaskNotesFencedBlock(lines: lines, lineIndex: &j, task: &t)
         return (t, j - startIndex)
     }
 
@@ -808,15 +894,21 @@ final class TaskStore: ObservableObject {
         let completedRaw = fields["fw/completed"]?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
         let completedFromTag = completedRaw == "1" || completedRaw == "true" || completedRaw == "yes"
 
+        let notesFromTag = fields["fw/notes"].map { decodeFwInlineEscapedText($0) } ?? ""
+
+        let createdAt = parseFwCreatedAtTag(fields["fw/created-at"]) ?? Date()
+
         return FocusTask(
             id: taskId,
             title: displayTitle,
+            createdAt: createdAt,
             priority: priority,
             projectId: projectId,
             estimatedMinutes: estMinutes,
             savedWorkRemainingSeconds: savedRem,
             totalFocusedSeconds: totalLapsed,
-            isCompleted: completedFromTag
+            isCompleted: completedFromTag,
+            notes: notesFromTag
         )
     }
 
@@ -862,7 +954,97 @@ final class TaskStore: ObservableObject {
             estimatedMinutes: estMinutes,
             savedWorkRemainingSeconds: savedRem,
             totalFocusedSeconds: totalLapsed,
-            isCompleted: isCompleted
+            isCompleted: isCompleted,
+            notes: ""
         )
+    }
+
+    private static let taskNotesFenceMarker = "fw-task-note"
+
+    private func maxConsecutiveBackticks(in string: String) -> Int {
+        var maxRun = 0
+        var run = 0
+        for c in string {
+            if c == "`" {
+                run += 1
+                maxRun = max(maxRun, run)
+            } else {
+                run = 0
+            }
+        }
+        return maxRun
+    }
+
+    private func appendTaskNotesFencedBlock(to lines: inout [String], notes: String) {
+        guard !notes.isEmpty else { return }
+        let fenceLen = max(3, maxConsecutiveBackticks(in: notes) + 1)
+        let fence = String(repeating: "`", count: fenceLen)
+        lines.append("  \(fence)\(Self.taskNotesFenceMarker)")
+        for line in notes.split(separator: "\n", omittingEmptySubsequences: false) {
+            lines.append("  \(line)")
+        }
+        lines.append("  \(fence)")
+    }
+
+    /// After the last `#fw/…` line, an optional fenced block `` `*fw-task-note … `* `` holds multi-line notes.
+    private func parseOptionalTaskNotesFencedBlock(lines: [String], lineIndex: inout Int, task: inout FocusTask) {
+        guard lineIndex < lines.count else { return }
+        let trimmed = lines[lineIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let fenceLen = openingFenceLengthForTaskNotesLine(trimmed) else { return }
+        let fence = String(repeating: "`", count: fenceLen)
+        lineIndex += 1
+        var body: [String] = []
+        while lineIndex < lines.count {
+            let closeCandidate = lines[lineIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+            if closeCandidate == fence {
+                lineIndex += 1
+                task.notes = body.joined(separator: "\n")
+                return
+            }
+            var line = lines[lineIndex]
+            if line.hasPrefix("  ") {
+                line = String(line.dropFirst(2))
+            }
+            body.append(line)
+            lineIndex += 1
+        }
+        task.notes = body.joined(separator: "\n")
+    }
+
+    private func openingFenceLengthForTaskNotesLine(_ trimmed: String) -> Int? {
+        guard trimmed.hasSuffix(Self.taskNotesFenceMarker) else { return nil }
+        let fencePart = trimmed.dropLast(Self.taskNotesFenceMarker.count)
+        guard fencePart.count >= 3, fencePart.allSatisfy({ $0 == "`" }) else { return nil }
+        return fencePart.count
+    }
+
+    /// Optional single-line `#fw/notes` with `\n` / `\\` escapes (hand-edited vaults).
+    private func decodeFwInlineEscapedText(_ raw: String) -> String {
+        var out = ""
+        var i = raw.startIndex
+        while i < raw.endIndex {
+            if raw[i] == "\\", raw.index(after: i) < raw.endIndex {
+                let n = raw.index(after: i)
+                switch raw[n] {
+                case "n":
+                    out.append("\n")
+                    i = raw.index(after: n)
+                    continue
+                case "r":
+                    out.append("\r")
+                    i = raw.index(after: n)
+                    continue
+                case "\\":
+                    out.append("\\")
+                    i = raw.index(after: n)
+                    continue
+                default:
+                    break
+                }
+            }
+            out.append(raw[i])
+            i = raw.index(after: i)
+        }
+        return out
     }
 }

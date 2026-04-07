@@ -7,8 +7,10 @@ private struct FloatingPanelContentHeightKey: PreferenceKey {
     }
 }
 
-/// Matches vertical shell padding above and below the scroll content (`.padding(6)` × 2).
-private let floatingPanelOuterVerticalMargin: CGFloat = 12
+/// Extra height added to reported content when sizing the panel (shell insets beyond measured scroll content).
+private let floatingPanelOuterVerticalMargin: CGFloat = 0
+
+private let floatingPanelShellCornerRadius: CGFloat = 22
 
 struct FloatingTimerView: View {
     @EnvironmentObject private var tasks: TaskStore
@@ -16,123 +18,49 @@ struct FloatingTimerView: View {
     @State private var previewTaskId: UUID?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                if let active = tasks.activeTask,
-                   let projectId = active.projectId,
-                   let project = tasks.projects.first(where: { $0.id == projectId }) {
-                    let ordered = tasks.tasksOrderedInProject(projectId: projectId)
-                    let activeIndex = ordered.firstIndex(where: { $0.id == active.id }) ?? 0
-                    let beforeActive = Array(ordered.prefix(activeIndex))
-                    let afterActive = Array(ordered.dropFirst(activeIndex + 1))
-
-                    VStack(spacing: 12) {
-                        if !beforeActive.isEmpty {
-                            VStack(spacing: 10) {
-                                ForEach(beforeActive, id: \.id) { task in
-                                    FloatingQueuedTaskRow(
-                                        taskId: task.id,
-                                        title: task.title,
-                                        isCompleted: task.isCompleted,
-                                        liquidEmbedded: false,
-                                        isSelected: previewTaskId == task.id,
-                                        timeSpendLine: queueTimeSpendLine(for: task),
-                                        originalTimeText: originalTimeLabel(for: task),
-                                        statusTimeText: statusTimeLabel(for: task),
-                                        statusTimeColor: statusTimeColor(for: task)
-                                    ) {
-                                        previewTaskId = (previewTaskId == task.id) ? nil : task.id
-                                    } onStartFocus: { taskId in
-                                        previewTaskId = nil
-                                        tasks.focusTask(id: taskId)
-                                        pomodoro.startOrResume()
-                                    } onResetTimer: { taskId in
-                                        tasks.resetTaskTimer(
-                                            id: taskId,
-                                            defaultWorkSeconds: pomodoro.settingsSnapshot.workSeconds
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        FloatingActiveTimerCard(
-                            pomodoro: pomodoro,
-                            projectName: project.name,
-                            taskTitle: active.title,
-                            liquidEmbedded: false
-                        )
-
-                        if !afterActive.isEmpty {
-                            VStack(spacing: 10) {
-                                ForEach(afterActive, id: \.id) { task in
-                                    FloatingQueuedTaskRow(
-                                        taskId: task.id,
-                                        title: task.title,
-                                        isCompleted: task.isCompleted,
-                                        liquidEmbedded: false,
-                                        isSelected: previewTaskId == task.id,
-                                        timeSpendLine: queueTimeSpendLine(for: task),
-                                        originalTimeText: originalTimeLabel(for: task),
-                                        statusTimeText: statusTimeLabel(for: task),
-                                        statusTimeColor: statusTimeColor(for: task)
-                                    ) {
-                                        previewTaskId = (previewTaskId == task.id) ? nil : task.id
-                                    } onStartFocus: { taskId in
-                                        previewTaskId = nil
-                                        tasks.focusTask(id: taskId)
-                                        pomodoro.startOrResume()
-                                    } onResetTimer: { taskId in
-                                        tasks.resetTaskTimer(
-                                            id: taskId,
-                                            defaultWorkSeconds: pomodoro.settingsSnapshot.workSeconds
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
-                } else {
-                    VStack(spacing: 10) {
-                        Text("No active task")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                        Text("Press Start on a task in the list.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(24)
-                    .background {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(FloatingTimerPalette.cardFill)
-                            .shadow(color: .black.opacity(0.07), radius: 12, x: 0, y: 5)
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(FloatingTimerPalette.cardStroke, lineWidth: 1)
-                    }
-                }
-            }
-            .padding(6)
-            .background(
-                GeometryReader { proxy in
-                    Color.clear.preference(key: FloatingPanelContentHeightKey.self, value: proxy.size.height)
-                }
-            )
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+        ZStack {
+            RoundedRectangle(cornerRadius: floatingPanelShellCornerRadius, style: .continuous)
                 .fill(FloatingTimerPalette.shellFill)
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(FloatingTimerPalette.shellStroke, lineWidth: 1)
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    if let active = tasks.activeTask,
+                       let projectId = active.projectId,
+                       let project = tasks.projects.first(where: { $0.id == projectId }) {
+                        activeProjectSection(active: active, project: project, projectId: projectId)
+                    } else {
+                        VStack(spacing: 10) {
+                            Text("No active task")
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text("Press Start on a task in the list.")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(24)
+                        .background {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(Color.white)
+                                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+                        }
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(Color.black.opacity(0.06), lineWidth: 0.5)
+                        }
+                    }
+                }
+                .padding(6)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: FloatingPanelContentHeightKey.self, value: proxy.size.height)
+                    }
+                )
+            }
         }
-        .padding(6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: floatingPanelShellCornerRadius, style: .continuous))
         .onPreferenceChange(FloatingPanelContentHeightKey.self) { height in
             #if os(macOS)
             FloatingPanelController.shared.applyReportedContentHeight(height + floatingPanelOuterVerticalMargin)
@@ -163,6 +91,87 @@ struct FloatingTimerView: View {
             if let previewTaskId, !ids.contains(previewTaskId) {
                 self.previewTaskId = nil
             }
+        }
+    }
+
+    /// Splits project tasks into rows above / below the active task (same order as the main list).
+    private func floatingActiveQueueSplit(ordered: [FocusTask], activeId: UUID) -> (before: [FocusTask], after: [FocusTask]) {
+        if let idx = ordered.firstIndex(where: { $0.id == activeId }) {
+            return (Array(ordered.prefix(idx)), Array(ordered.dropFirst(idx + 1)))
+        }
+        return ([], ordered.filter { $0.id != activeId })
+    }
+
+    @ViewBuilder
+    private func activeProjectSection(active: FocusTask, project: FocusProject, projectId: UUID) -> some View {
+        let ordered = tasks.tasksOrderedInProject(projectId: projectId).filter { !$0.isCompleted }
+        let defWork = pomodoro.settingsSnapshot.workSeconds
+
+        VStack(spacing: 12) {
+            if ordered.isEmpty {
+                Text("No open tasks in this project")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+            } else {
+                let split = floatingActiveQueueSplit(ordered: ordered, activeId: active.id)
+                let beforeActive = split.before
+                let afterActive = split.after
+
+                if !beforeActive.isEmpty {
+                    VStack(spacing: 10) {
+                        ForEach(beforeActive, id: \.id) { task in
+                            floatingQueuedRow(task: task, defaultWorkSeconds: defWork)
+                        }
+                    }
+                }
+
+                if !active.isCompleted {
+                    FloatingActiveTimerCard(
+                        pomodoro: pomodoro,
+                        projectName: project.name,
+                        taskTitle: active.title,
+                        taskNotes: active.notes,
+                        liquidEmbedded: false
+                    )
+                }
+
+                if !afterActive.isEmpty {
+                    VStack(spacing: 10) {
+                        ForEach(afterActive, id: \.id) { task in
+                            floatingQueuedRow(task: task, defaultWorkSeconds: defWork)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func floatingQueuedRow(task: FocusTask, defaultWorkSeconds: Int) -> some View {
+        FloatingQueuedTaskRow(
+            taskId: task.id,
+            title: task.title,
+            notes: task.notes,
+            isCompleted: task.isCompleted,
+            liquidEmbedded: false,
+            isSelected: previewTaskId == task.id,
+            timeSpendLine: queueTimeSpendLine(for: task),
+            originalTimeText: originalTimeLabel(for: task),
+            statusTimeText: statusTimeLabel(for: task),
+            statusTimeColor: statusTimeColor(for: task)
+        ) {
+            previewTaskId = (previewTaskId == task.id) ? nil : task.id
+        } onStartFocus: { taskId in
+            previewTaskId = nil
+            tasks.focusTask(id: taskId)
+            pomodoro.startOrResume()
+        } onResetTimer: { taskId in
+            tasks.resetTaskTimer(id: taskId, defaultWorkSeconds: defaultWorkSeconds)
         }
     }
 
@@ -272,34 +281,76 @@ struct FloatingTimerView: View {
 // MARK: - Palette
 
 private enum FloatingTimerPalette {
-    static let cardFill: Color = {
-        #if os(macOS)
-        Color(nsColor: .windowBackgroundColor)
-        #else
-        Color(uiColor: .secondarySystemGroupedBackground)
-        #endif
-    }()
+    static let cardFill = Color.white
 
-    static let queueCardFill: Color = {
-        #if os(macOS)
-        Color.white
-        #else
-        Color(uiColor: .systemBackground)
-        #endif
-    }()
+    static let queueCardFill = Color(red: 0.96, green: 0.96, blue: 0.97)
 
     static let shellFill: Color = {
         #if os(macOS)
-        Color(nsColor: .underPageBackgroundColor).opacity(0.94)
+        Color(red: 0.95, green: 0.95, blue: 0.96).opacity(0.98)
         #else
         Color(uiColor: .systemGray6)
         #endif
     }()
 
-    static let cardStroke = Color.primary.opacity(0.08)
-    static let shellStroke = Color.primary.opacity(0.12)
-    static let progressTrack = Color.gray.opacity(0.2)
-    static let progressBlue = Color(red: 0.22, green: 0.52, blue: 0.96)
+    static let cardStroke = Color.black.opacity(0.06)
+    static let shellStroke = Color.black.opacity(0.10)
+    static let progressTrack = Color.black.opacity(0.08)
+    static let progressBlue = Color(red: 0.30, green: 0.56, blue: 1.0)
+    static let progressBlueEnd = Color(red: 0.50, green: 0.72, blue: 1.0)
+
+    static let transportButtonRest = Color.black.opacity(0.05)
+    static let transportButtonHover = Color.black.opacity(0.12)
+    static let transportForeground = Color.primary
+}
+
+// MARK: - Notes popover (shared with task list)
+
+enum TaskNotesPopoverMetrics {
+    /// Fixed popover width so long notes wrap instead of stretching the window horizontally.
+    static let width: CGFloat = 300
+    static let horizontalPadding: CGFloat = 16
+    static var textColumnWidth: CGFloat { width - horizontalPadding * 2 }
+    static let scrollMaxHeight: CGFloat = 280
+}
+
+struct TaskNotesPopoverContent: View {
+    let taskTitle: String
+    let notes: String
+
+    private var trimmed: String {
+        notes.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        let w = TaskNotesPopoverMetrics.textColumnWidth
+        VStack(alignment: .leading, spacing: 10) {
+            Text(taskTitle)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(width: w, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+                .frame(width: w)
+
+            ScrollView {
+                Text(trimmed.isEmpty ? "No notes for this task." : notes)
+                    .font(.callout)
+                    .foregroundStyle(trimmed.isEmpty ? .tertiary : .secondary)
+                    .multilineTextAlignment(.leading)
+                    .frame(width: w, alignment: .topLeading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .frame(maxWidth: w, maxHeight: TaskNotesPopoverMetrics.scrollMaxHeight)
+        }
+        .padding(TaskNotesPopoverMetrics.horizontalPadding)
+        .frame(width: TaskNotesPopoverMetrics.width, alignment: .topLeading)
+        .fixedSize(horizontal: true, vertical: false)
+    }
 }
 
 // MARK: - Active card
@@ -309,10 +360,12 @@ private struct FloatingActiveTimerCard: View {
     @ObservedObject var pomodoro: PomodoroEngine
     let projectName: String
     let taskTitle: String
+    let taskNotes: String
     var liquidEmbedded: Bool = false
     @State private var isResetButtonHovered = false
     @State private var isPlayButtonHovered = false
     @State private var isCompleteButtonHovered = false
+    @State private var showNotesPopover = false
 
     private var taskIsCompleted: Bool {
         tasks.activeTask?.isCompleted == true
@@ -429,32 +482,43 @@ private struct FloatingActiveTimerCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(projectName)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(projectName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+                Spacer()
+            }
 
             if showPhaseBanner {
                 Text(phaseLabel)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(phaseBannerColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background {
+                        Capsule(style: .continuous)
+                            .fill(phaseBannerColor.opacity(0.15))
+                    }
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(taskTitle)
-                    .font(.title2.weight(.bold))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Button(action: cycleActiveTaskPriority) {
                         Image(systemName: "bookmark.fill")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(floatingBookmarkFillColor(for: activeTaskPriority))
-                            .frame(minWidth: 22, minHeight: 28)
+                            .frame(minWidth: 22, minHeight: 26)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -462,11 +526,28 @@ private struct FloatingActiveTimerCard: View {
                     .help("Cycle priority (Later → Urgent → Next)")
                     #endif
 
+                    Button {
+                        showNotesPopover = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                            .frame(minWidth: 22, minHeight: 26)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showNotesPopover, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                        TaskNotesPopoverContent(taskTitle: taskTitle, notes: taskNotes)
+                    }
+                    #if os(macOS)
+                    .help("Show task notes")
+                    #endif
+
                     if taskIsCompleted {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.green)
-                            .frame(minWidth: 22, minHeight: 28)
+                            .frame(minWidth: 22, minHeight: 26)
                             .accessibilityLabel("Completed")
                     }
                 }
@@ -474,21 +555,29 @@ private struct FloatingActiveTimerCard: View {
             .frame(maxWidth: .infinity)
 
             Text(timeString)
-                .font(.system(size: 42, weight: .bold, design: .rounded))
+                .font(.system(size: 48, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(timerTextColor)
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(FloatingTimerPalette.progressTrack)
                     Capsule()
-                        .fill(progressTint)
-                        .frame(width: max(4, geo.size.width * CGFloat(min(1, sessionProgress))))
+                        .fill(
+                            LinearGradient(
+                                colors: [progressTint, FloatingTimerPalette.progressBlueEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(6, geo.size.width * CGFloat(min(1, sessionProgress))))
                 }
             }
-            .frame(height: 10)
+            .frame(height: 6)
+            .clipShape(Capsule())
             .animation(.easeInOut(duration: 0.25), value: sessionProgress)
 
             HStack(alignment: .center, spacing: 0) {
@@ -498,12 +587,12 @@ private struct FloatingActiveTimerCard: View {
                             pomodoro.resetActiveTaskCountdownToEstimate()
                         } label: {
                             Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.black)
-                                .frame(width: 44, height: 44)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(FloatingTimerPalette.transportForeground)
+                                .frame(width: 40, height: 40)
                                 .background {
                                     Circle()
-                                        .fill(isResetButtonHovered ? Color.gray.opacity(0.28) : Color.clear)
+                                        .fill(isResetButtonHovered ? FloatingTimerPalette.transportButtonHover : FloatingTimerPalette.transportButtonRest)
                                 }
                                 .contentShape(Circle())
                         }
@@ -526,13 +615,13 @@ private struct FloatingActiveTimerCard: View {
                         pomodoro.startOrResume()
                     }
                 } label: {
-                    Image(systemName: pomodoro.isRunning ? "pause" : "play")
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(.black)
-                        .frame(width: 44, height: 44)
+                    Image(systemName: pomodoro.isRunning ? "pause.fill" : "play.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(FloatingTimerPalette.transportForeground)
+                        .frame(width: 48, height: 48)
                         .background {
                             Circle()
-                                .fill(isPlayButtonHovered ? Color.gray.opacity(0.28) : Color.clear)
+                                .fill(isPlayButtonHovered ? FloatingTimerPalette.transportButtonHover : FloatingTimerPalette.transportButtonRest)
                         }
                         .contentShape(Circle())
                 }
@@ -556,12 +645,12 @@ private struct FloatingActiveTimerCard: View {
                             pomodoro.syncAfterMarkingActiveTaskComplete()
                         } label: {
                             Image(systemName: "checkmark.circle")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.black)
-                                .frame(width: 44, height: 44)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(FloatingTimerPalette.transportForeground)
+                                .frame(width: 40, height: 40)
                                 .background {
                                     Circle()
-                                        .fill(isCompleteButtonHovered ? Color.gray.opacity(0.28) : Color.clear)
+                                        .fill(isCompleteButtonHovered ? FloatingTimerPalette.transportButtonHover : FloatingTimerPalette.transportButtonRest)
                                 }
                                 .contentShape(Circle())
                         }
@@ -577,10 +666,10 @@ private struct FloatingActiveTimerCard: View {
                 }
                 .frame(width: 44, alignment: .trailing)
             }
-            .padding(.top, 6)
+            .padding(.top, 4)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, liquidEmbedded ? 20 : 22)
+        .padding(.vertical, liquidEmbedded ? 20 : 24)
         .padding(.bottom, liquidEmbedded ? 2 : 0)
         .frame(maxWidth: .infinity)
         .modifier(LiquidCardChrome(enabled: !liquidEmbedded))
@@ -622,12 +711,12 @@ private struct LiquidCardChrome: ViewModifier {
             content
                 .background {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(FloatingTimerPalette.cardFill)
-                        .shadow(color: .black.opacity(0.1), radius: 14, x: 0, y: 6)
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(FloatingTimerPalette.cardStroke, lineWidth: 1)
+                        .stroke(Color.black.opacity(0.06), lineWidth: 0.5)
                 }
         } else {
             content
@@ -654,6 +743,7 @@ private struct FloatingQueuedTaskRow: View {
     @EnvironmentObject private var tasks: TaskStore
     let taskId: UUID
     let title: String
+    let notes: String
     var isCompleted: Bool = false
     var liquidEmbedded: Bool = false
     var isSelected: Bool = false
@@ -667,6 +757,7 @@ private struct FloatingQueuedTaskRow: View {
     let onResetTimer: (UUID) -> Void
     @State private var isQueuedPlayHovered = false
     @State private var isQueuedResetHovered = false
+    @State private var showNotesPopover = false
 
     private var rowPriority: FocusTaskPriority {
         tasks.tasks.first(where: { $0.id == taskId })?.priority ?? .later
@@ -687,16 +778,16 @@ private struct FloatingQueuedTaskRow: View {
         VStack(alignment: .leading, spacing: isSelected ? 8 : 0) {
             HStack(alignment: .top, spacing: 10) {
                 Button(action: onSelect) {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(title)
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
                             .lineLimit(2)
                             .minimumScaleFactor(0.85)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Text(timeSpendLine)
-                            .font(.caption.weight(.medium))
+                            .font(.caption2.weight(.medium))
                             .foregroundStyle(.tertiary)
                             .multilineTextAlignment(.leading)
                     }
@@ -708,9 +799,9 @@ private struct FloatingQueuedTaskRow: View {
                 HStack(spacing: 6) {
                     Button(action: cycleQueuedPriority) {
                         Image(systemName: "bookmark.fill")
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(floatingBookmarkFillColor(for: rowPriority))
-                            .frame(minWidth: 22, minHeight: 28)
+                            .frame(minWidth: 20, minHeight: 26)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -718,36 +809,55 @@ private struct FloatingQueuedTaskRow: View {
                     .help("Cycle priority (Later → Urgent → Next)")
                     #endif
 
+                    Button {
+                        showNotesPopover = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                            .frame(minWidth: 20, minHeight: 26)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showNotesPopover, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                        TaskNotesPopoverContent(taskTitle: title, notes: notes)
+                    }
+                    #if os(macOS)
+                    .help("Show task notes")
+                    #endif
+
                     if isCompleted {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.green)
-                            .frame(minWidth: 22, minHeight: 28)
+                            .frame(minWidth: 20, minHeight: 26)
                             .accessibilityLabel("Completed")
                     }
                 }
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, isSelected ? 0 : 12)
 
             if isSelected {
-                Divider()
-                    .padding(.horizontal, 18)
+                Rectangle()
+                    .fill(Color.black.opacity(0.06))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 16)
                 HStack(alignment: .center, spacing: 10) {
                     Button(action: onSelect) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Text("est \(originalTimeText)")
-                                .font(.caption.weight(.medium))
+                                .font(.caption2.weight(.medium))
                                 .foregroundStyle(.secondary)
-                            Text("•")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            Text("·")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                             Text(statusTimeText)
-                                .font(.caption.weight(.semibold))
+                                .font(.caption2.weight(.semibold))
                                 .foregroundStyle(statusTimeColor)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -758,12 +868,12 @@ private struct FloatingQueuedTaskRow: View {
                             onResetTimer(taskId)
                         } label: {
                             Image(systemName: "arrow.counterclockwise")
-                                .font(.title2.weight(.medium))
-                                .foregroundStyle(.black)
-                                .frame(width: 44, height: 44)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(FloatingTimerPalette.transportForeground)
+                                .frame(width: 36, height: 36)
                                 .background {
                                     Circle()
-                                        .fill(isQueuedResetHovered ? Color.gray.opacity(0.28) : Color.clear)
+                                        .fill(isQueuedResetHovered ? FloatingTimerPalette.transportButtonHover : FloatingTimerPalette.transportButtonRest)
                                 }
                                 .contentShape(Circle())
                         }
@@ -777,13 +887,13 @@ private struct FloatingQueuedTaskRow: View {
                         Button {
                             onStartFocus(taskId)
                         } label: {
-                            Image(systemName: "play")
-                                .font(.title2.weight(.medium))
-                                .foregroundStyle(.black)
-                                .frame(width: 44, height: 44)
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(FloatingTimerPalette.transportForeground)
+                                .frame(width: 36, height: 36)
                                 .background {
                                     Circle()
-                                        .fill(isQueuedPlayHovered ? Color.gray.opacity(0.28) : Color.clear)
+                                        .fill(isQueuedPlayHovered ? FloatingTimerPalette.transportButtonHover : FloatingTimerPalette.transportButtonRest)
                                 }
                                 .contentShape(Circle())
                         }
@@ -795,7 +905,7 @@ private struct FloatingQueuedTaskRow: View {
                         .accessibilityLabel("Start this task")
                     }
                 }
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 12)
             }
         }
@@ -803,21 +913,21 @@ private struct FloatingQueuedTaskRow: View {
             Group {
                 if liquidEmbedded {
                     Capsule(style: .continuous)
-                        .fill(Color.primary.opacity(isSelected ? 0.06 : 0.025))
+                        .fill(FloatingTimerPalette.queueCardFill)
                 } else {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(FloatingTimerPalette.queueCardFill)
-                        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(isSelected ? 0.06 : 0.03), radius: isSelected ? 6 : 3, x: 0, y: isSelected ? 3 : 1)
                 }
             }
         }
         .overlay {
             if liquidEmbedded {
                 Capsule(style: .continuous)
-                    .stroke(Color.primary.opacity(isSelected ? 0.2 : 0.09), lineWidth: 1)
+                    .stroke(Color.black.opacity(isSelected ? 0.10 : 0.05), lineWidth: 0.5)
             } else {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.primary.opacity(isSelected ? 0.22 : 0.12), lineWidth: 1.2)
+                    .stroke(Color.black.opacity(isSelected ? 0.10 : 0.05), lineWidth: 0.5)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isSelected)

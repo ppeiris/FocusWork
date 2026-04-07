@@ -76,6 +76,8 @@ struct FocusTask: Identifiable, Codable, Equatable {
     var totalFocusedSeconds: Int
     /// True when the task reached the end of its focus countdown.
     var isCompleted: Bool
+    /// Multi-line notes stored in the vault under the task (not shown in the floating timer).
+    var notes: String
 
     init(
         id: UUID = UUID(),
@@ -86,7 +88,8 @@ struct FocusTask: Identifiable, Codable, Equatable {
         estimatedMinutes: Int? = nil,
         savedWorkRemainingSeconds: Int? = nil,
         totalFocusedSeconds: Int = 0,
-        isCompleted: Bool = false
+        isCompleted: Bool = false,
+        notes: String = ""
     ) {
         self.id = id
         self.title = title
@@ -97,6 +100,7 @@ struct FocusTask: Identifiable, Codable, Equatable {
         self.savedWorkRemainingSeconds = savedWorkRemainingSeconds
         self.totalFocusedSeconds = totalFocusedSeconds
         self.isCompleted = isCompleted
+        self.notes = notes
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -109,6 +113,7 @@ struct FocusTask: Identifiable, Codable, Equatable {
         case savedWorkRemainingSeconds
         case totalFocusedSeconds
         case isCompleted
+        case notes
     }
 
     init(from decoder: Decoder) throws {
@@ -122,6 +127,7 @@ struct FocusTask: Identifiable, Codable, Equatable {
         savedWorkRemainingSeconds = try container.decodeIfPresent(Int.self, forKey: .savedWorkRemainingSeconds)
         totalFocusedSeconds = try container.decodeIfPresent(Int.self, forKey: .totalFocusedSeconds) ?? 0
         isCompleted = try container.decodeIfPresent(Bool.self, forKey: .isCompleted) ?? false
+        notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
     }
 
     func encode(to encoder: Encoder) throws {
@@ -135,5 +141,6 @@ struct FocusTask: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(savedWorkRemainingSeconds, forKey: .savedWorkRemainingSeconds)
         try container.encode(totalFocusedSeconds, forKey: .totalFocusedSeconds)
         try container.encode(isCompleted, forKey: .isCompleted)
+        try container.encode(notes, forKey: .notes)
     }
 }

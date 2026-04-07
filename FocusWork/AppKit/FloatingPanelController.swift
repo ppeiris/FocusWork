@@ -43,7 +43,7 @@ final class FloatingPanelController: NSObject {
             let initialSize = NSSize(width: panelContentWidth, height: 360)
             let p = FloatingPanel(
                 contentRect: NSRect(x: 80, y: 80, width: initialSize.width, height: initialSize.height),
-                styleMask: [.nonactivatingPanel, .borderless, .resizable],
+                styleMask: [.nonactivatingPanel, .borderless],
                 backing: .buffered,
                 defer: false
             )
@@ -61,6 +61,12 @@ final class FloatingPanelController: NSObject {
             let root = FloatingTimerRoot(model: model)
             let host = NSHostingController(rootView: root)
             host.view.translatesAutoresizingMaskIntoConstraints = false
+            host.view.wantsLayer = true
+            host.view.layer?.isOpaque = false
+            host.view.layer?.backgroundColor = NSColor.clear.cgColor
+            host.view.layer?.cornerRadius = 22
+            host.view.layer?.cornerCurve = .continuous
+            host.view.layer?.masksToBounds = true
             p.contentViewController = host
             p.setContentSize(initialSize)
             p.minSize = NSSize(width: panelContentWidth, height: minPanelHeight)

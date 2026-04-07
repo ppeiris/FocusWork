@@ -66,6 +66,8 @@ private struct TaskEstimatePick: Hashable {
 }
 
 private struct TaskTimeSummaryLine {
+    /// Localized “added” date (task creation / added to project).
+    let addedLabel: String
     let original: String
     let elapsed: String
     let left: String
@@ -78,6 +80,7 @@ struct TaskListView: View {
     @EnvironmentObject private var pomodoro: PomodoroEngine
 
     @State private var newTitle = ""
+    @State private var newTaskNotes = ""
     @State private var newTaskEstimatePick = TaskEstimatePick.newTaskDefaultPick
     @State private var newTaskCustomMinutesText = ""
     @State private var newProjectName = ""
@@ -90,13 +93,13 @@ struct TaskListView: View {
     @State private var editProjectName = ""
     @State private var editingTaskId: FocusTask.ID?
     @State private var editTitle = ""
+    @State private var editTaskNotes = ""
     @State private var editTaskEstimatePick = TaskEstimatePick.infinityPick
     @State private var editTaskCustomMinutesText = ""
     @State private var newTaskProjectId: FocusProject.ID?
     @State private var draggingId: FocusTask.ID?
     @State private var draggingProjectCardId: FocusProject.ID?
     @State private var draggingProjectId: FocusProject.ID?
-    @State private var orderedIdsByProject: [FocusProject.ID: [FocusTask.ID]] = [:]
     @State private var expandedProjectIds: Set<FocusProject.ID> = []
     @State private var hoverDestinationId: FocusTask.ID? = nil
     @State private var hoverProjectDestinationId: FocusProject.ID?
@@ -109,6 +112,8 @@ struct TaskListView: View {
     @State private var hoveredTaskId: FocusTask.ID?
     /// Project card highlighted while a task is dragged over it (move to project).
     @State private var hoverTaskOnProjectCardId: FocusProject.ID?
+
+    @State private var isAddProjectHovered = false
 
     var body: some View {
         ZStack {
@@ -126,10 +131,20 @@ struct TaskListView: View {
                                 Spacer()
                                 Button(action: { showingNewProjectSheet = true }) {
                                     Image(systemName: "plus")
-                                        .font(.title3.weight(.semibold))
-                                        .frame(width: 30, height: 30)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 32, height: 32)
+                                        .background {
+                                            Circle()
+                                                .fill(isAddProjectHovered ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.06))
+                                        }
+                                        .contentShape(Circle())
                                 }
                                 .buttonStyle(.plain)
+                                .animation(.easeInOut(duration: 0.15), value: isAddProjectHovered)
+                                #if os(macOS)
+                                .onHover { isAddProjectHovered = $0 }
+                                #endif
                                 .accessibilityLabel("Create new project")
                             }
 
@@ -153,17 +168,18 @@ struct TaskListView: View {
                                     } label: {
                                         HStack(spacing: 0) {
                                             Text(project.name)
-                                                .font(.title3.weight(.semibold))
+                                                .font(.headline.weight(.bold))
                                                 .lineLimit(1)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
 
                                             Spacer(minLength: 8)
 
                                             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                                .font(.title3.weight(.semibold))
-                                                .frame(width: 28, height: 28)
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 24, height: 24)
                                         }
-                                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
                                         .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
@@ -203,8 +219,9 @@ struct TaskListView: View {
                                         }
                                     } label: {
                                         Image(systemName: "ellipsis")
-                                            .font(.title3.weight(.semibold))
-                                            .frame(width: 28, height: 28)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 26, height: 26)
                                     }
                                     .menuStyle(.borderlessButton)
                                     .menuIndicator(.hidden)
@@ -271,17 +288,29 @@ struct TaskListView: View {
                                 if isExpanded {
                                         Button {
                                             newTaskProjectId = project.id
+                                            newTitle = ""
+                                            newTaskNotes = ""
                                             newTaskEstimatePick = .newTaskDefaultPick
                                             newTaskCustomMinutesText = ""
                                             showingNewTaskSheet = true
                                         } label: {
-                                            HStack { Spacer(); Image(systemName: "plus").font(.title3.weight(.semibold)); Spacer() }
-                                                .padding(.vertical, 14)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                        .fill(Color.white)
-                                                        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
-                                                )
+                                            HStack {
+                                                Spacer()
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 13, weight: .bold))
+                                                    .foregroundStyle(.secondary)
+                                                Spacer()
+                                            }
+                                            .padding(.vertical, 12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .fill(Color.white.opacity(0.7))
+                                                    .shadow(color: .black.opacity(0.03), radius: 3, x: 0, y: 1)
+                                            )
+                                            .overlay {
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+                                            }
                                         }
                                         .buttonStyle(.plain)
 
@@ -330,19 +359,20 @@ struct TaskListView: View {
                                     }
                                 }
                             }
-                            .padding(12)
+                            .padding(14)
                             .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
                                     .fill(projectBackgroundColor(project.cardColor))
                             )
                             .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
                                     .stroke(
-                                        Color.accentColor.opacity(hoverTaskOnProjectCardId == project.id ? 0.45 : 0),
+                                        Color.accentColor.opacity(hoverTaskOnProjectCardId == project.id ? 0.40 : 0),
                                         lineWidth: 2
                                     )
                             }
-                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 3)
+                            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                             .onTapGesture {
                                 guard !isExpanded else { return }
                                 toggleProjectExpansion(project.id)
@@ -448,7 +478,7 @@ struct TaskListView: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
-                    .animation(.spring(response: 0.32, dampingFraction: 0.86), value: orderedIdsByProject)
+                    .animation(.spring(response: 0.32, dampingFraction: 0.86), value: tasks.listOrderedTaskIdsByProject)
                     .animation(.easeInOut(duration: 0.15), value: draggingId)
                     .animation(.spring(response: 0.32, dampingFraction: 0.86), value: hoverDestinationId)
                     .animation(.spring(response: 0.32, dampingFraction: 0.86), value: hoverTaskListEndProjectId)
@@ -490,20 +520,22 @@ struct TaskListView: View {
         .sheet(isPresented: $showingNewTaskSheet) {
             NewTaskSheet(
                 newTitle: $newTitle,
+                newNotes: $newTaskNotes,
                 estimatePick: $newTaskEstimatePick,
                 customMinutesText: $newTaskCustomMinutesText,
                 onAdd: { addTaskToPendingProject() }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingEditTaskSheet) {
             EditTaskSheet(
                 editTitle: $editTitle,
+                editNotes: $editTaskNotes,
                 estimatePick: $editTaskEstimatePick,
                 customMinutesText: $editTaskCustomMinutesText,
                 onSave: { saveEditedTask() }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
         }
         .onAppear {
             tasks.reloadFromStorage()
@@ -591,7 +623,7 @@ struct TaskListView: View {
     private func orderedTasks(for projectId: FocusProject.ID) -> [FocusTask] {
         let projectTasks = tasksForProject(projectId)
         let map = Dictionary(uniqueKeysWithValues: projectTasks.map { ($0.id, $0) })
-        let orderedIds = orderedIdsByProject[projectId] ?? projectTasks.map(\.id)
+        let orderedIds = tasks.orderedTaskIds(for: projectId)
         return orderedIds.compactMap { map[$0] }
     }
 
@@ -672,11 +704,16 @@ struct TaskListView: View {
         }()
 
         return TaskTimeSummaryLine(
+            addedLabel: Self.taskAddedDateLabel(for: task.createdAt),
             original: Self.compactClockLabel(forSeconds: originalSeconds),
             elapsed: Self.compactClockLabel(forSeconds: elapsedSeconds),
             left: Self.compactClockLabel(forSeconds: leftSeconds),
             overtime: overtimeSeconds.map { Self.compactClockLabel(forSeconds: $0) }
         )
+    }
+
+    private static func taskAddedDateLabel(for date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().year().locale(.autoupdatingCurrent))
     }
 
     @ViewBuilder
@@ -695,6 +732,7 @@ struct TaskListView: View {
 
             CreationRow(
                 title: task.title,
+                notes: task.notes,
                 estimatedMinutes: task.estimatedMinutes,
                 totalFocusedSeconds: task.totalFocusedSeconds,
                 timeLeftCaption: taskTimeLeftCaption(for: task),
@@ -826,9 +864,14 @@ struct TaskListView: View {
     }
 
     private func startProject(_ project: FocusProject) {
-        guard let firstTask = orderedTasks(for: project.id).first else { return }
-        tasks.focusTask(id: firstTask.id)
         expandedProjectIds.insert(project.id)
+        guard let firstOpen = orderedTasks(for: project.id).first(where: { !$0.isCompleted }) else {
+            #if os(macOS)
+            FloatingPanelController.shared.configureIfNeeded(model: model)
+            #endif
+            return
+        }
+        tasks.focusTask(id: firstOpen.id)
         #if os(macOS)
         FloatingPanelController.shared.configureIfNeeded(model: model)
         #endif
@@ -844,16 +887,7 @@ struct TaskListView: View {
     }
 
     private func syncProjectOrders() {
-        var updated: [FocusProject.ID: [FocusTask.ID]] = [:]
-        for project in tasks.projects {
-            let newIds = tasksForProject(project.id).map(\.id)
-            let existing = orderedIdsByProject[project.id] ?? []
-            let existingSet = Set(existing)
-            let newOnly = newIds.filter { !existingSet.contains($0) }
-            let filteredExisting = existing.filter { newIds.contains($0) }
-            updated[project.id] = filteredExisting + newOnly
-        }
-        orderedIdsByProject = updated
+        tasks.syncListOrderWithTasks()
     }
 
     private func bookmarkColor(for task: FocusTask) -> Color? {
@@ -879,23 +913,24 @@ struct TaskListView: View {
     }
 
     private func reorderLocally(sourceId: FocusTask.ID, destinationId: FocusTask.ID, projectId: FocusProject.ID) {
-        guard var ids = orderedIdsByProject[projectId],
-              let from = ids.firstIndex(of: sourceId),
+        var ids = tasks.orderedTaskIds(for: projectId)
+        guard let from = ids.firstIndex(of: sourceId),
               let to = ids.firstIndex(of: destinationId) else { return }
         if from == to { return }
         withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
             let element = ids.remove(at: from)
             ids.insert(element, at: to)
-            orderedIdsByProject[projectId] = ids
+            tasks.setListOrderedTaskIds(projectId: projectId, ids: ids)
         }
     }
 
     private func reorderLocallyToEnd(sourceId: FocusTask.ID, projectId: FocusProject.ID) {
-        guard var ids = orderedIdsByProject[projectId], let from = ids.firstIndex(of: sourceId) else { return }
+        var ids = tasks.orderedTaskIds(for: projectId)
+        guard let from = ids.firstIndex(of: sourceId) else { return }
         withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
             let element = ids.remove(at: from)
             ids.append(element)
-            orderedIdsByProject[projectId] = ids
+            tasks.setListOrderedTaskIds(projectId: projectId, ids: ids)
         }
     }
 
@@ -909,18 +944,16 @@ struct TaskListView: View {
             } else {
                 reorderLocallyToEnd(sourceId: sourceId, projectId: destinationProjectId)
             }
-            if let ordered = orderedIdsByProject[destinationProjectId] {
-                tasks.setTaskOrder(projectId: destinationProjectId, orderedTaskIds: ordered)
-            }
+            let ordered = tasks.orderedTaskIds(for: destinationProjectId)
+            tasks.setTaskOrder(projectId: destinationProjectId, orderedTaskIds: ordered)
             return
         }
 
-        if var sourceIds = orderedIdsByProject[sourceProjectId] {
-            sourceIds.removeAll { $0 == sourceId }
-            orderedIdsByProject[sourceProjectId] = sourceIds
-        }
+        var sourceIds = tasks.orderedTaskIds(for: sourceProjectId)
+        sourceIds.removeAll { $0 == sourceId }
+        tasks.setListOrderedTaskIds(projectId: sourceProjectId, ids: sourceIds)
 
-        var destIds = orderedIdsByProject[destinationProjectId] ?? tasksForProject(destinationProjectId).map(\.id)
+        var destIds = tasks.orderedTaskIds(for: destinationProjectId)
         destIds.removeAll { $0 == sourceId }
 
         tasks.moveTaskToProject(taskId: sourceId, projectId: destinationProjectId)
@@ -930,10 +963,8 @@ struct TaskListView: View {
         } else {
             destIds.append(sourceId)
         }
-        orderedIdsByProject[destinationProjectId] = destIds
-        if let sourceIds = orderedIdsByProject[sourceProjectId] {
-            tasks.setTaskOrder(projectId: sourceProjectId, orderedTaskIds: sourceIds)
-        }
+        tasks.setListOrderedTaskIds(projectId: destinationProjectId, ids: destIds)
+        tasks.setTaskOrder(projectId: sourceProjectId, orderedTaskIds: tasks.orderedTaskIds(for: sourceProjectId))
         tasks.setTaskOrder(projectId: destinationProjectId, orderedTaskIds: destIds)
         syncProjectOrders()
     }
@@ -941,9 +972,10 @@ struct TaskListView: View {
     private func addTaskToPendingProject() {
         guard let projectId = newTaskProjectId else { return }
         let minutes = TaskEstimatePick.resolveEstimatedMinutes(pick: newTaskEstimatePick, customText: newTaskCustomMinutesText)
-        tasks.addTask(title: newTitle, estimatedMinutes: minutes, projectId: projectId)
+        tasks.addTask(title: newTitle, estimatedMinutes: minutes, projectId: projectId, notes: newTaskNotes)
         syncProjectOrders()
         newTitle = ""
+        newTaskNotes = ""
         newTaskEstimatePick = .newTaskDefaultPick
         newTaskCustomMinutesText = ""
         newTaskProjectId = nil
@@ -976,6 +1008,7 @@ struct TaskListView: View {
     private func beginEditing(_ task: FocusTask) {
         editingTaskId = task.id
         editTitle = task.title
+        editTaskNotes = task.notes
         let matched = TaskEstimatePick.matching(stored: task.estimatedMinutes)
         editTaskEstimatePick = matched.pick
         editTaskCustomMinutesText = matched.customText
@@ -985,10 +1018,11 @@ struct TaskListView: View {
     private func saveEditedTask() {
         guard let taskId = editingTaskId else { return }
         let minutes = TaskEstimatePick.resolveEstimatedMinutes(pick: editTaskEstimatePick, customText: editTaskCustomMinutesText)
-        tasks.updateTask(id: taskId, title: editTitle, estimatedMinutes: minutes)
+        tasks.updateTask(id: taskId, title: editTitle, estimatedMinutes: minutes, notes: editTaskNotes)
         showingEditTaskSheet = false
         editingTaskId = nil
         editTitle = ""
+        editTaskNotes = ""
         editTaskEstimatePick = .infinityPick
         editTaskCustomMinutesText = ""
     }
@@ -996,9 +1030,6 @@ struct TaskListView: View {
     private func deleteTask(_ task: FocusTask) {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
             tasks.deleteTask(id: task.id)
-            if let projectId = task.projectId {
-                orderedIdsByProject[projectId]?.removeAll { $0 == task.id }
-            }
         }
     }
 
@@ -1025,15 +1056,15 @@ struct TaskListView: View {
     private func projectBackgroundColor(_ color: FocusProjectCardColor) -> Color {
         switch color {
         case .gray:
-            return Color.gray.opacity(0.16)
+            return Color(red: 0.94, green: 0.94, blue: 0.95)
         case .blue:
-            return Color.blue.opacity(0.14)
+            return Color(red: 0.90, green: 0.93, blue: 0.99)
         case .green:
-            return Color.green.opacity(0.14)
+            return Color(red: 0.90, green: 0.96, blue: 0.92)
         case .orange:
-            return Color.orange.opacity(0.16)
+            return Color(red: 0.99, green: 0.94, blue: 0.90)
         case .pink:
-            return Color.pink.opacity(0.16)
+            return Color(red: 0.98, green: 0.91, blue: 0.94)
         }
     }
 
@@ -1215,13 +1246,14 @@ private struct ActiveFocusTaskCard: View {
 
 /// Shared metrics so list rows and the drag preview stay visually aligned.
 private enum TaskRowCardMetrics {
-    static let cornerRadius: CGFloat = 14
-    static let horizontalPadding: CGFloat = 14
+    static let cornerRadius: CGFloat = 16
+    static let horizontalPadding: CGFloat = 16
     static let verticalPadding: CGFloat = 14
 }
 
 private struct CreationRow: View {
     let title: String
+    var notes: String = ""
     var estimatedMinutes: Int? = nil
     var totalFocusedSeconds: Int = 0
     var timeLeftCaption: String? = nil
@@ -1245,17 +1277,13 @@ private struct CreationRow: View {
 
     private var cardFill: Color {
         if isBeingDragged {
-            #if os(macOS)
-            return Color(nsColor: .quaternaryLabelColor).opacity(0.28)
-            #else
-            return Color.gray.opacity(0.28)
-            #endif
+            return Color.primary.opacity(0.06)
         }
         if usesLightGrayCard {
             #if os(macOS)
-            return isElevated ? Color(nsColor: .controlAccentColor).opacity(0.08) : Color(nsColor: .controlBackgroundColor)
+            return isElevated ? Color.accentColor.opacity(0.06) : Color(nsColor: .controlBackgroundColor)
             #else
-            return isElevated ? Color(white: 0.93) : Color(white: 0.95)
+            return isElevated ? Color(white: 0.94) : Color(white: 0.96)
             #endif
         }
         return Color.white
@@ -1264,6 +1292,7 @@ private struct CreationRow: View {
     var body: some View {
         TaskRowCardContent(
             title: title,
+            notes: notes,
             estimatedMinutes: estimatedMinutes,
             totalFocusedSeconds: totalFocusedSeconds,
             timeLeftCaption: timeLeftCaption,
@@ -1284,17 +1313,17 @@ private struct CreationRow: View {
             .background {
                 RoundedRectangle(cornerRadius: TaskRowCardMetrics.cornerRadius, style: .continuous)
                     .fill(cardFill)
+                    .shadow(color: .black.opacity(isElevated ? 0.10 : 0.04), radius: isElevated ? 10 : 4, x: 0, y: isElevated ? 6 : 2)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: TaskRowCardMetrics.cornerRadius, style: .continuous)
                     .stroke(
-                        isBeingDragged ? Color.gray.opacity(0.35) : Color.black.opacity(isElevated ? 0.10 : 0),
-                        lineWidth: isBeingDragged ? 1.5 : 1
+                        isBeingDragged ? Color.gray.opacity(0.30) : Color.primary.opacity(isElevated ? 0.08 : 0.04),
+                        lineWidth: 0.5
                     )
             }
             .clipShape(RoundedRectangle(cornerRadius: TaskRowCardMetrics.cornerRadius, style: .continuous))
-            .scaleEffect(isElevated ? 1.01 : 1.0)
-            .shadow(color: .black.opacity(isElevated ? 0.16 : 0.06), radius: isElevated ? 12 : 6, x: 0, y: isElevated ? 8 : 3)
+            .scaleEffect(isElevated ? 1.015 : 1.0)
             .opacity(isBeingDragged ? 0.5 : 1.0)
             .animation(.spring(response: 0.22, dampingFraction: 0.86), value: isElevated)
             .animation(.easeInOut(duration: 0.15), value: isBeingDragged)
@@ -1304,6 +1333,7 @@ private struct CreationRow: View {
 
 private struct TaskRowCardContent: View {
     let title: String
+    var notes: String = ""
     var estimatedMinutes: Int? = nil
     var totalFocusedSeconds: Int = 0
     var timeLeftCaption: String? = nil
@@ -1318,6 +1348,7 @@ private struct TaskRowCardContent: View {
     var onReset: (() -> Void)? = nil
     var onDelete: (() -> Void)?
     @State private var showsActionsPopover = false
+    @State private var showNotesPopover = false
 
     private static func focusDurationLabel(_ sec: Int) -> String {
         let h = sec / 3600
@@ -1328,38 +1359,77 @@ private struct TaskRowCardContent: View {
         return "\(s)s"
     }
 
+    private var notesPreview: String {
+        notes.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Extra space between notes and the time row so the two blocks read as separate.
+    private var timeRowTopInset: CGFloat {
+        guard !notesPreview.isEmpty else { return 0 }
+        if timeSummary != nil { return 10 }
+        if let m = estimatedMinutes, m > 0 { return 10 }
+        if timeLeftCaption != nil { return 10 }
+        if totalFocusedSeconds > 0 { return 10 }
+        return 0
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if let summary = timeSummary {
-                    (Text("est: \(summary.original) · time elapsed: \(summary.elapsed) · time left: \(summary.left)")
-                        .foregroundStyle(.secondary)
-                     + Text(summary.overtime.map { " · over time +\($0)" } ?? "")
-                        .foregroundStyle(.red))
-                        .font(.caption.weight(.medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                } else {
-                    if let m = estimatedMinutes, m > 0 {
-                        Text("Est. \(TaskEstimatePick.displayLabel(minutes: m))")
-                            .font(.caption)
+                if !notesPreview.isEmpty {
+                    Button {
+                        showNotesPopover = true
+                    } label: {
+                        Text(notesPreview)
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.tail)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
-                    if let timeLeftCaption {
-                        Text(timeLeftCaption)
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showNotesPopover, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                        TaskNotesPopoverContent(taskTitle: title, notes: notes)
+                    }
+                    #if os(macOS)
+                    .help("Show full notes")
+                    #endif
+                }
+                Group {
+                    if let summary = timeSummary {
+                        (Text("added \(summary.addedLabel) · est: \(summary.original) · time elapsed: \(summary.elapsed) · time left: \(summary.left)")
+                            .foregroundStyle(.secondary)
+                         + Text(summary.overtime.map { " · over time +\($0)" } ?? "")
+                            .foregroundStyle(.red))
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    if totalFocusedSeconds > 0 {
-                        Text("Focused \(Self.focusDurationLabel(totalFocusedSeconds))")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    } else {
+                        if let m = estimatedMinutes, m > 0 {
+                            Text("Est. \(TaskEstimatePick.displayLabel(minutes: m))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let timeLeftCaption {
+                            Text(timeLeftCaption)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        if totalFocusedSeconds > 0 {
+                            Text("Focused \(Self.focusDurationLabel(totalFocusedSeconds))")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
+                .padding(.top, timeRowTopInset)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -1488,15 +1558,14 @@ private struct ActionRowLabel: View {
 
 private struct PlaceholderRow: View {
     var body: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color.gray.opacity(0.15))
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(Color.accentColor.opacity(0.06))
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [6, 6]))
-                    .foregroundStyle(Color.gray.opacity(0.5))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [6, 6]))
+                    .foregroundStyle(Color.accentColor.opacity(0.30))
             )
-            .frame(height: 56)
-            .shadow(color: .black.opacity(0.03), radius: 3, x: 0, y: 1)
+            .frame(height: 52)
             .padding(.horizontal, 0)
             .padding(.vertical, 2)
             .accessibilityLabel("Drop here")
@@ -1557,6 +1626,7 @@ private struct ListEndDropPlaceholderRow: View {
 
 private struct NewTaskSheet: View {
     @Binding var newTitle: String
+    @Binding var newNotes: String
     @Binding var estimatePick: TaskEstimatePick
     @Binding var customMinutesText: String
     var onAdd: () -> Void
@@ -1580,6 +1650,27 @@ private struct NewTaskSheet: View {
                 .onSubmit {
                     addAndDismiss()
                 }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Notes")
+                    .font(.subheadline.weight(.medium))
+                Text("Saved in your Obsidian project file; not shown in the floating timer.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextEditor(text: $newNotes)
+                    .font(.body)
+                    .frame(minHeight: 120, maxHeight: 220)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                            .background {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.primary.opacity(0.04))
+                            }
+                    }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Estimated time to complete")
@@ -1614,7 +1705,7 @@ private struct NewTaskSheet: View {
             }
         }
         .padding(20)
-        .frame(minWidth: 420)
+        .frame(minWidth: 480)
         .onAppear {
             titleFieldFocused = true
         }
@@ -1727,6 +1818,7 @@ private struct EditProjectSheet: View {
 
 private struct EditTaskSheet: View {
     @Binding var editTitle: String
+    @Binding var editNotes: String
     @Binding var estimatePick: TaskEstimatePick
     @Binding var customMinutesText: String
     var onSave: () -> Void
@@ -1750,6 +1842,27 @@ private struct EditTaskSheet: View {
                 .onSubmit {
                     saveAndDismiss()
                 }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Notes")
+                    .font(.subheadline.weight(.medium))
+                Text("Saved in your Obsidian project file; not shown in the floating timer.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextEditor(text: $editNotes)
+                    .font(.body)
+                    .frame(minHeight: 120, maxHeight: 220)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                            .background {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.primary.opacity(0.04))
+                            }
+                    }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Estimated time to complete")
@@ -1784,7 +1897,7 @@ private struct EditTaskSheet: View {
             }
         }
         .padding(20)
-        .frame(minWidth: 420)
+        .frame(minWidth: 480)
         .onAppear {
             titleFieldFocused = true
         }
